@@ -1,5 +1,3 @@
-
-import { Clock, MapPin, AlertTriangle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const ItineraryTimeline = ({ itinerary }) => {
@@ -9,13 +7,14 @@ const ItineraryTimeline = ({ itinerary }) => {
     <div className="flex flex-col gap-6 overflow-y-auto custom-scrollbar h-full pb-20">
       {itinerary.days.map((day, dIdx) => (
         <div key={dIdx} className="relative">
-          <div className="sticky top-0 z-10 py-2 bg-[var(--bg-dark)]/90 backdrop-blur-md mb-4 border-b border-[var(--panel-border)]">
-            <h3 className="text-lg font-bold neon-text-cyan flex items-center gap-2">
-              <CheckCircle size={18} /> Day {day.day}
+          <div className="sticky top-0 z-10 py-2 bg-surface-container-lowest/90 backdrop-blur-md mb-4 border-b border-outline-variant">
+            <h3 className="font-mono text-2xl font-semibold leading-tight text-primary flex items-center gap-2 tracking-widest">
+              <span className="material-symbols-outlined text-[20px]">calendar_today</span> 
+              DAY {day.day}
             </h3>
           </div>
 
-          <div className="space-y-4 ml-4 border-l-2 border-cyan-900/50 relative">
+          <div className="space-y-4 ml-4 border-l border-outline-variant relative">
             {day.route.map((step, sIdx) => (
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
@@ -25,35 +24,36 @@ const ItineraryTimeline = ({ itinerary }) => {
                 className="relative pl-6 pb-4 group"
               >
                 {/* Node dot */}
-                <div className="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-[#050511] border-2 border-cyan-800 group-hover:border-cyan-400 group-hover:bg-cyan-400 group-hover:shadow-[0_0_10px_#00f0ff] transition-all" />
+                <div className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-surface-container-lowest border border-outline-variant group-hover:border-primary group-hover:bg-primary shadow-sm group-hover:shadow-[0_0_8px_#baf2ff] transition-all" />
                 
-                <div className="glass-panel glass-panel-hover p-4 rounded-xl space-y-2 transition-all duration-300">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-white drop-shadow-md flex items-center gap-2">
-                      <MapPin size={16} className="text-cyan-400 drop-shadow-[0_0_5px_#00f0ff]" />
+                <div className="bg-surface-container border border-outline-variant p-3 rounded-lg group-hover:border-primary/50 transition-all duration-300">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-sans text-base font-normal font-bold text-on-surface flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
                       {step.location.name}
                     </h4>
-                    <span className="text-xs font-mono text-cyan-200 bg-[var(--bg-dark)] border border-cyan-400/20 shadow-[inset_0_0_5px_rgba(0,240,255,0.1)] px-2 py-1 rounded">
+                    <span className="font-mono text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded uppercase">
                       {step.arrivalTime} - {step.departureTime}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-4 text-sm text-[var(--text-muted)]">
+                  <div className="flex items-center gap-4 text-[10px] font-mono text-on-surface-variant uppercase">
                     <div className="flex items-center gap-1">
-                      <Clock size={14} />
-                      <span>{step.location.duration} min visit</span>
+                      <span className="material-symbols-outlined text-[14px]">schedule</span>
+                      <span>{step.location.duration}m DWELL</span>
                     </div>
                     {step.travelFromPrev > 0 && (
-                      <div className="text-xs text-[var(--text-muted)]">
-                        {step.travelFromPrev} min travel from prev
+                      <div className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">route</span>
+                        <span>{step.travelFromPrev}m TRANSIT</span>
                       </div>
                     )}
                   </div>
 
                   {/* Warnings for this specific location */}
                   {itinerary.warnings.filter(w => w.includes(step.location.name)).map((w, wIdx) => (
-                    <div key={wIdx} className="mt-2 text-xs text-yellow-400 flex items-center gap-1 bg-yellow-400/10 p-2 rounded border border-yellow-400/30 shadow-[0_0_10px_rgba(250,204,21,0.2)]">
-                      <AlertTriangle size={12} />
+                    <div key={wIdx} className="mt-3 text-[10px] font-mono text-tertiary-container flex items-center gap-2 bg-tertiary-container/10 p-2 border border-tertiary-container/30 rounded">
+                      <span className="material-symbols-outlined text-[14px]">warning</span>
                       {w}
                     </div>
                   ))}
@@ -65,13 +65,14 @@ const ItineraryTimeline = ({ itinerary }) => {
       ))}
 
       {itinerary.warnings.length > 0 && (
-        <div className="mt-8 p-4 bg-fuchsia-500/10 border border-fuchsia-500/30 shadow-[0_0_15px_rgba(255,0,85,0.2)] rounded-xl">
-          <h4 className="text-fuchsia-400 drop-shadow-[0_0_5px_rgba(255,0,85,0.5)] font-bold flex items-center gap-2 mb-2">
-            <AlertTriangle size={18} /> Feasibility Alerts
+        <div className="mt-8 p-3 bg-error/10 border border-error/30 rounded-lg">
+          <h4 className="text-error font-mono text-[12px] font-bold flex items-center gap-2 mb-2 tracking-widest">
+            <span className="material-symbols-outlined text-[18px]">gpp_bad</span> 
+            CRITICAL MISSION ALERTS
           </h4>
           <ul className="space-y-1">
             {itinerary.warnings.map((w, i) => (
-              <li key={i} className="text-xs text-fuchsia-200">• {w}</li>
+              <li key={i} className="font-mono text-[10px] text-error/80">• {w}</li>
             ))}
           </ul>
         </div>

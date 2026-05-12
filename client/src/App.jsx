@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Map as MapIcon, Settings2 } from 'lucide-react';
 import MapComponent from './components/MapComponent';
 import ItineraryTimeline from './components/ItineraryTimeline';
 import ConstraintPanel from './components/ConstraintPanel';
@@ -10,11 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const API_BASE = "http://localhost:5000/api";
 
 function App() {
-  const [locations, setLocations] = useState([
-    { name: "Central Park", lat: 40.7829, lng: -73.9654, duration: 120, mandatory: true, timeWindow: { open: 480, close: 1200 } },
-    { name: "Times Square", lat: 40.7580, lng: -73.9855, duration: 60, mandatory: false, timeWindow: { open: 0, close: 1440 } },
-    { name: "Empire State Building", lat: 40.7484, lng: -73.9857, duration: 90, mandatory: true, timeWindow: { open: 480, close: 1320 } },
-  ]);
+  const [locations, setLocations] = useState([]);
 
   const [constraints, setConstraints] = useState({
     maxDays: 2,
@@ -26,32 +21,57 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [directions, setDirections] = useState(null);
   const [discoveryResults, setDiscoveryResults] = useState([]);
-  const [startLocationName, setStartLocationName] = useState("Hotel (Start)");
+  const [startLocationName, setStartLocationName] = useState("");
 
   // Auto-optimize when locations or constraints change
   useEffect(() => {
     const timer = setTimeout(() => {
       if (locations.length > 0) {
-        handleOptimize();
+        handleOptimize(false);
       }
     }, 1000); // 1s debounce
 
     return () => clearTimeout(timer);
   }, [locations, constraints]);
 
-  const handleOptimize = async () => {
+  const handleOptimize = async (isManual = false) => {
+    if (locations.length === 0) {
+      if (isManual) alert("Please add at least one destination before running the optimization engine.");
+      return;
+    }
+
     setLoading(true);
     try {
+      let sourceLat = locations.length > 0 ? locations[0].lat : 40.7549;
+      let sourceLng = locations.length > 0 ? locations[0].lng : -73.9840;
+
+      if (startLocationName && startLocationName.toLowerCase() !== "hotel (start)") {
+        try {
+          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+          const geoRes = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json`, {
+            params: { address: startLocationName, key: apiKey }
+          });
+          if (geoRes.data.status === 'OK' && geoRes.data.results.length > 0) {
+            sourceLat = geoRes.data.results[0].geometry.location.lat;
+            sourceLng = geoRes.data.results[0].geometry.location.lng;
+          }
+        } catch (e) {
+          console.error("Geocoding failed for start location", e);
+        }
+      }
+
       const response = await axios.post(`${API_BASE}/optimize`, {
-        source: { name: startLocationName || "Start Location", lat: 40.7549, lng: -73.9840 },
+        source: { name: startLocationName || (locations.length > 0 ? locations[0].name : "Start Location"), lat: sourceLat, lng: sourceLng },
         destinations: locations,
         constraints
       });
       setItinerary(response.data);
-      setActiveTab('itinerary');
+      if (isManual === true) {
+        setActiveTab('itinerary');
+      }
     } catch (error) {
       console.error("Optimization failed", error);
-      alert("Error optimizing itinerary. Is the backend running?");
+      if (isManual) alert("Error optimizing itinerary. Is the backend running?");
     } finally {
       setLoading(false);
     }
@@ -59,77 +79,116 @@ function App() {
 
   const handleAddLocations = (newLocations) => {
     // Prevent duplicates by name
-    const existingNames = new Set(locations.map(l => l.name));
-    const filtered = newLocations.filter(nl => !existingNames.has(nl.name));
-    setLocations([...locations, ...filtered]);
-    setActiveTab('constraints');
-    
-    // Check for capacity warning
-    if (locations.length + filtered.length > 8) {
-      alert("Warning: Selected locations might exceed feasible travel capacity for the given days.");
-    }
+    setLocations(prevLocations => {
+      const existingNames = new Set(prevLocations.map(l => l.name));
+      const filtered = newLocations.filter(nl => !existingNames.has(nl.name));
+
+      // Check for capacity warning
+      if (prevLocations.length + filtered.length > 8) {
+        alert("Warning: Selected locations might exceed feasible travel capacity for the given days.");
+      }
+
+      return [...prevLocations, ...filtered];
+    });
   };
 
   const sendFeedback = async (actionType) => {
     try {
       await axios.post(`${API_BASE}/feedback`, { actionType });
-      handleOptimize(); // Re-run with new weights
+      handleOptimize(false); // Re-run with new weights
     } catch (error) {
       console.error("Feedback failed", error);
     }
   };
 
   return (
-    <div className="flex flex-col-reverse md:flex-row h-screen w-full bg-[var(--bg-dark)] text-[var(--text-main)] overflow-hidden font-sans">
-      {/* Sidebar */}
-      <aside className="flex-none w-full md:w-96 h-[45vh] md:h-screen flex flex-col border-t md:border-t-0 md:border-r border-[var(--panel-border)] shadow-[2px_0_20px_rgba(0,0,0,0.5)] z-20 glass-panel">
-        <header className="p-6 border-b border-[var(--panel-border)]">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.4)]">
-              <MapIcon className="text-white drop-shadow-md" />
-            </div>
-            <div>
-              <h1 className="font-bold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500">CAA-TIOS</h1>
-              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold">Constraint-Aware Engine</p>
-            </div>
-          </div>
-        </header>
-
-        {/* Tabs */}
-        <div className="flex px-6 pt-6 gap-6 text-sm font-medium border-b border-[var(--panel-border)]">
-          <button 
-            onClick={() => setActiveTab('constraints')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'constraints' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
-          >
-            Constraints
-          </button>
-          <button 
-            onClick={() => setActiveTab('discovery')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'discovery' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
-          >
-            Discovery
-          </button>
-          <button 
-            onClick={() => setActiveTab('itinerary')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'itinerary' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
-          >
-            Itinerary
-          </button>
+    <div className="bg-background text-on-background flex h-screen overflow-hidden font-sans">
+      {/* Side Navigation */}
+      <aside className="flex flex-col h-full py-6 bg-surface-container-lowest border-r border-outline-variant fixed w-[256px] left-0 top-0 z-50">
+        <div className="px-6 mb-10">
+          <h1 className="font-mono text-2xl font-semibold leading-tight font-bold text-primary">CAA-TIOS-ND</h1>
+          <p className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase text-on-surface-variant tracking-widest mt-1">MISSION CONTROL</p>
         </div>
 
-        <div className="flex-1 p-6 overflow-hidden">
+        <nav className="flex-1 space-y-1">
+          <button
+            onClick={() => setActiveTab('constraints')}
+            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'constraints'
+                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+          >
+            <span className="material-symbols-outlined mr-3">tune</span>
+            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">SETTINGS</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('discovery')}
+            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'discovery'
+                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+          >
+            <span className="material-symbols-outlined mr-3">explore</span>
+            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">DISCOVERY</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('itinerary')}
+            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'itinerary'
+                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+              }`}
+          >
+            <span className="material-symbols-outlined mr-3">map</span>
+            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">ITINERARY</span>
+          </button>
+        </nav>
+
+        <div className="px-4 mt-auto">
+          <button
+            onClick={() => handleOptimize(true)}
+            className="w-full py-3 px-4 bg-primary text-on-primary font-bold text-[11px] font-bold tracking-[0.15em] uppercase rounded-lg flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+          >
+            <span className="material-symbols-outlined">rocket_launch</span>
+            RUN OPTIMIZATION
+          </button>
+        </div>
+      </aside>
+
+      {/* Top App Bar */}
+      <header className="fixed top-0 right-0 left-[256px] h-[64px] w-[calc(100%-256px)] flex justify-between items-center px-6 bg-[#131b2e] border-b border-[#3b494c] z-50">
+        <div className="flex items-center gap-8">
+          <span className="font-mono text-2xl font-semibold leading-tight text-[#baf2ff] font-bold">
+            {activeTab === 'constraints' ? 'LOGISTICS CONFIGURATION' :
+              activeTab === 'discovery' ? 'DISCOVERY ENGINE' : 'ITINERARY VISUALIZATION'}
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#4edea3] shadow-[0_0_8px_#4edea3]"></div>
+            <span className="font-mono text-[10px] font-medium tracking-tight text-[#bac9cd] uppercase">System Online</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Canvas */}
+      <main className="ml-[256px] mt-[64px] flex w-[calc(100%-256px)] h-[calc(100vh-64px)] overflow-hidden bg-[#060e20]">
+
+        {/* Left Panel (30-40% depending on tab) */}
+        <section className={`border-r border-outline-variant bg-surface-container flex flex-col custom-scrollbar overflow-y-auto transition-all duration-300 ${activeTab === 'itinerary' ? 'w-full' : 'w-1/3 min-w-[400px]'}`}>
           <AnimatePresence mode="wait">
-            {activeTab === 'constraints' ? (
-              <motion.div 
+            {activeTab === 'constraints' && (
+              <motion.div
                 key="constraints"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="h-full"
+                className="h-full flex flex-col"
               >
-                <ConstraintPanel 
-                  onOptimize={handleOptimize} 
-                  locations={locations} 
+                <ConstraintPanel
+                  onOptimize={() => handleOptimize(true)}
+                  locations={locations}
                   setLocations={setLocations}
                   constraints={constraints}
                   setConstraints={setConstraints}
@@ -137,100 +196,73 @@ function App() {
                   setStartLocationName={setStartLocationName}
                 />
               </motion.div>
-            ) : activeTab === 'discovery' ? (
-              <motion.div 
+            )}
+
+            {activeTab === 'discovery' && (
+              <motion.div
                 key="discovery"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="h-full"
+                className="h-full flex flex-col"
               >
                 <DiscoveryPanel onAddLocations={handleAddLocations} onSearchResults={setDiscoveryResults} />
               </motion.div>
-            ) : (
-              <motion.div 
+            )}
+
+            {activeTab === 'itinerary' && (
+              <motion.div
                 key="itinerary"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="h-full"
+                className="h-full flex flex-col p-6"
               >
                 {itinerary ? (
                   <ItineraryTimeline itinerary={itinerary} />
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-slate-500">
-                    <Settings2 size={48} className="opacity-20" />
-                    <p>No itinerary generated yet.<br/>Configure constraints and run optimization.</p>
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-outline">
+                    <span className="material-symbols-outlined text-[48px] opacity-20">settings_alert</span>
+                    <p className="font-mono">NO ITINERARY GENERATED<br />CONFIGURE CONSTRAINTS AND RUN OPTIMIZATION</p>
                   </div>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      </aside>
+        </section>
 
-      {/* Main Map Area */}
-      <main className="flex-1 relative h-[55vh] md:h-screen min-w-0">
-        <MapComponent locations={locations} itinerary={itinerary} discoveryResults={discoveryResults} />
-        
-        {/* Floating Info Overlay */}
-        <div className="absolute top-6 right-6 space-y-4">
-          {itinerary && (
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="glass-panel p-4 rounded-2xl neon-border-cyan shadow-2xl min-w-[200px]"
-            >
-              <div className="text-[10px] uppercase neon-text-cyan font-bold mb-2 tracking-wider">Trip Summary</div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-cyan-200">{itinerary.days.length}</div>
-                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Days</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-cyan-200">{Math.round(itinerary.totalTravelTime / 60)}h</div>
-                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Travel</div>
-                </div>
-              </div>
+        {/* Right Map Interface */}
+        {activeTab !== 'itinerary' && (
+          <section className="flex-1 relative bg-[#060e20]">
+            <MapComponent
+              locations={locations}
+              itinerary={itinerary}
+              discoveryResults={discoveryResults}
+              onAddFromMap={(place) => {
+                handleAddLocations([{
+                  name: place.name,
+                  lat: place.lat,
+                  lng: place.lng,
+                  duration: 60,
+                  mandatory: false,
+                  timeWindow: { open: 540, close: 1080 }
+                }]);
+              }}
+            />
 
-              <div className="mt-4 pt-4 border-t border-[var(--panel-border)] space-y-2">
-                <div className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1 tracking-wider">Train ML Agent</div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => sendFeedback('PREFERENCE_TIME')}
-                    className="flex-1 bg-[var(--bg-dark)] hover:bg-slate-800 text-[10px] py-1.5 rounded transition-all border border-[var(--panel-border)] hover:border-cyan-400/50"
-                  >
-                    Prioritize Time
-                  </button>
-                  <button 
-                    onClick={() => sendFeedback('PREFERENCE_DISTANCE')}
-                    className="flex-1 bg-[var(--bg-dark)] hover:bg-slate-800 text-[10px] py-1.5 rounded transition-all border border-[var(--panel-border)] hover:border-cyan-400/50"
-                  >
-                    Prioritize Dist
-                  </button>
+            {/* Overlays */}
+            {loading && (
+              <div className="absolute inset-0 z-50 bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-center">
+                <div className="flex flex-col items-center space-y-6">
+                  <div className="relative w-16 h-16">
+                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
+                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-[0_0_15px_#baf2ff]" />
+                  </div>
+                  <p className="font-mono text-primary tracking-widest animate-pulse">RUNNING GENETIC ALGORITHM...</p>
                 </div>
               </div>
-            </motion.div>
-          )}
-          
-          <div className="glass-panel p-4 rounded-2xl border border-[var(--panel-border)] shadow-2xl flex items-center gap-3">
-             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse" />
-             <span className="text-xs font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500 tracking-wider">Optimization Engine Active</span>
-          </div>
-        </div>
-
-        {loading && (
-          <div className="absolute inset-0 z-50 bg-[#050511]/80 backdrop-blur-md flex items-center justify-center">
-            <div className="flex flex-col items-center space-y-6">
-              <div className="relative w-16 h-16">
-                <div className="absolute inset-0 border-4 border-cyan-400/20 rounded-full" />
-                <div className="absolute inset-0 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_#00f0ff]" />
-                <div className="absolute inset-2 border-4 border-fuchsia-500/20 rounded-full" />
-                <div className="absolute inset-2 border-4 border-fuchsia-500 border-b-transparent rounded-full animate-spin-reverse shadow-[0_0_10px_#ff0055]" style={{animationDirection: "reverse"}} />
-              </div>
-              <p className="neon-text-cyan font-bold tracking-widest animate-pulse uppercase text-sm">Running Genetic Algorithm...</p>
-            </div>
-          </div>
+            )}
+          </section>
         )}
       </main>
     </div>

@@ -11,7 +11,7 @@ const center = {
   lng: -74.0060
 };
 
-const MapComponent = ({ locations, itinerary, discoveryResults = [] }) => {
+const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMap }) => {
   const [directions, setDirections] = useState(null);
 
   const { isLoaded } = useJsApiLoader({
@@ -95,7 +95,7 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [] }) => {
       center={mapCenter}
       zoom={12}
       options={{
-        styles: naturalMapStyles,
+        styles: darkMapStyles,
         disableDefaultUI: true,
         zoomControl: true,
         mapTypeControl: true,
@@ -116,6 +116,12 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [] }) => {
           position={marker.position}
           title={marker.title}
           icon={marker.icon}
+          onClick={() => {
+             const place = discoveryResults.find(r => `disc-${r.id}` === marker.id || `disc-${r.name}` === marker.id || `disc-${discoveryResults.indexOf(r)}` === marker.id);
+             if (place && onAddFromMap) {
+                onAddFromMap(place);
+             }
+          }}
         />
       ))}
 
@@ -136,19 +142,25 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [] }) => {
   ) : <div className="w-full h-full flex items-center justify-center bg-[var(--bg-dark)] text-[var(--text-muted)]">Loading Map...</div>;
 };
 
-const naturalMapStyles = [
-  { featureType: "water", stylers: [{ color: "#aee0f4" }] },
-  { featureType: "landscape.man_made", stylers: [{ color: "#f5f5f5" }] },
-  { featureType: "landscape.natural", stylers: [{ color: "#d2f3e0" }] },
-  { featureType: "poi.park", stylers: [{ color: "#b6e5cb" }] },
-  { featureType: "road.highway", stylers: [{ color: "#ffffff" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#e0e0e0" }] },
-  { featureType: "road.arterial", stylers: [{ color: "#ffffff" }] },
-  { featureType: "road.local", stylers: [{ color: "#ffffff" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#555555" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
-  { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#333333" }] },
-  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "off" }] }
+const darkMapStyles = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] }
 ];
 
 export default MapComponent;
