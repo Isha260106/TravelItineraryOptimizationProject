@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, DirectionsService, DirectionsRenderer } from '@react-google-maps/api';
+import { useMemo, useState, useEffect } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
 
 const mapContainerStyle = {
   width: '100%',
@@ -11,7 +11,7 @@ const center = {
   lng: -74.0060
 };
 
-const MapComponent = ({ locations, itinerary }) => {
+const MapComponent = ({ locations, itinerary, discoveryResults = [] }) => {
   const [directions, setDirections] = useState(null);
 
   const { isLoaded } = useJsApiLoader({
@@ -25,7 +25,7 @@ const MapComponent = ({ locations, itinerary }) => {
 
     const google = window.google;
     const waypoints = [];
-    
+
     // Flatten all locations from all days into a sequence of waypoints
     itinerary.days.forEach(day => {
       day.route.forEach(step => {
@@ -69,23 +69,53 @@ const MapComponent = ({ locations, itinerary }) => {
     }));
   }, [locations]);
 
+  const discoveryMarkers = useMemo(() => {
+    if (!discoveryResults) return [];
+    return discoveryResults.map((loc, idx) => ({
+      id: `disc-${loc.id || idx}`,
+      position: { lat: loc.lat, lng: loc.lng },
+      title: loc.name,
+      icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+    }));
+  }, [discoveryResults]);
+
+  const mapCenter = useMemo(() => {
+    if (discoveryResults && discoveryResults.length > 0) {
+      return { lat: discoveryResults[0].lat, lng: discoveryResults[0].lng };
+    }
+    if (markers.length > 0) {
+      return markers[0].position;
+    }
+    return center;
+  }, [markers, discoveryResults]);
+
   return isLoaded ? (
     <GoogleMap
       mapContainerStyle={mapContainerStyle}
-      center={markers[0]?.position || center}
+      center={mapCenter}
       zoom={12}
       options={{
-        styles: darkMapStyles,
+        styles: naturalMapStyles,
         disableDefaultUI: true,
         zoomControl: true,
+        mapTypeControl: true,
       }}
     >
       {markers.map(marker => (
-        <Marker 
-          key={marker.id} 
-          position={marker.position} 
+        <Marker
+          key={marker.id}
+          position={marker.position}
           label={marker.label}
           title={marker.title}
+        />
+      ))}
+
+      {discoveryMarkers.map(marker => (
+        <Marker
+          key={marker.id}
+          position={marker.position}
+          title={marker.title}
+          icon={marker.icon}
         />
       ))}
 
@@ -95,22 +125,30 @@ const MapComponent = ({ locations, itinerary }) => {
           options={{
             suppressMarkers: true, // We already have custom markers
             polylineOptions: {
-              strokeColor: '#38bdf8',
-              strokeOpacity: 0.8,
-              strokeWeight: 5,
+              strokeColor: '#2563eb', // Royal blue for visibility on light natural map
+              strokeOpacity: 0.9,
+              strokeWeight: 6,
             }
           }}
         />
       )}
     </GoogleMap>
-  ) : <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-400">Loading Map...</div>;
+  ) : <div className="w-full h-full flex items-center justify-center bg-[var(--bg-dark)] text-[var(--text-muted)]">Loading Map...</div>;
 };
 
-const darkMapStyles = [
-  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  // ... more dark styles can be added for premium look
+const naturalMapStyles = [
+  { featureType: "water", stylers: [{ color: "#aee0f4" }] },
+  { featureType: "landscape.man_made", stylers: [{ color: "#f5f5f5" }] },
+  { featureType: "landscape.natural", stylers: [{ color: "#d2f3e0" }] },
+  { featureType: "poi.park", stylers: [{ color: "#b6e5cb" }] },
+  { featureType: "road.highway", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#e0e0e0" }] },
+  { featureType: "road.arterial", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.local", stylers: [{ color: "#ffffff" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#555555" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+  { featureType: "administrative", elementType: "labels.text.fill", stylers: [{ color: "#333333" }] },
+  { featureType: "poi", elementType: "labels.icon", stylers: [{ visibility: "off" }] }
 ];
 
 export default MapComponent;

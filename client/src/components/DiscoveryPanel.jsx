@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Search, Compass, Star, MapPin, Plus, Check, ShieldCheck } from 'lucide-react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 
-const DiscoveryPanel = ({ onAddLocations }) => {
+const DiscoveryPanel = ({ onAddLocations, onSearchResults }) => {
   const [query, setQuery] = useState("");
   const [radius, setRadius] = useState(5000);
   const [results, setResults] = useState([]);
@@ -21,6 +21,7 @@ const DiscoveryPanel = ({ onAddLocations }) => {
         params: { location: query, radius }
       });
       setResults(response.data.places);
+      if (onSearchResults) onSearchResults(response.data.places);
     } catch (error) {
       console.error("Search failed", error);
       setError(error.response?.data?.error || "Search failed. Check your API key and billing.");
@@ -66,6 +67,7 @@ const DiscoveryPanel = ({ onAddLocations }) => {
     onAddLocations(selectedPlaces);
     // Reset state
     setResults([]);
+    if (onSearchResults) onSearchResults([]);
     setSelectedIds(new Set());
     setMandatoryIds(new Set());
     setQuery("");
@@ -80,15 +82,15 @@ const DiscoveryPanel = ({ onAddLocations }) => {
             placeholder="Search area (e.g. London)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-slate-800/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm focus:border-sky-500 outline-none transition-all"
+            className="w-full bg-[var(--bg-dark)] border border-[var(--panel-border)] rounded-xl pl-10 pr-4 py-3 text-sm focus:border-cyan-400 focus:shadow-[0_0_15px_rgba(0,240,255,0.3)] outline-none transition-all"
           />
-          <Search className="absolute left-3 top-3.5 text-slate-500" size={18} />
+          <Search className="absolute left-3 top-3.5 text-[var(--text-muted)]" size={18} />
         </div>
 
         <div className="space-y-2">
-          <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500">
+          <div className="flex justify-between text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-widest">
             <span>Radius</span>
-            <span className="text-sky-400">{radius/1000}km</span>
+            <span className="neon-text-cyan">{radius/1000}km</span>
           </div>
           <input 
             type="range" 
@@ -97,19 +99,19 @@ const DiscoveryPanel = ({ onAddLocations }) => {
             step="1000"
             value={radius}
             onChange={(e) => setRadius(parseInt(e.target.value))}
-            className="w-full accent-sky-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+            className="w-full accent-cyan-400 h-1 bg-[var(--panel-border)] rounded-lg appearance-none cursor-pointer"
           />
         </div>
 
         <button 
           onClick={searchNearby}
           disabled={loading || !query}
-          className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-3 rounded-xl border border-white/5 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+          className="w-full bg-[var(--bg-dark)] hover:bg-[#0a0f1e] text-[var(--text-main)] py-3 rounded-xl border border-[var(--panel-border)] hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(0,240,255,0.2)] flex items-center justify-center gap-2 transition-all disabled:opacity-50"
         >
           {loading ? (
-            <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shadow-[0_0_10px_#00f0ff]" />
           ) : (
-            <><Compass size={18} className="text-sky-400" /> Discover Nearby Places</>
+            <><Compass size={18} className="text-cyan-400 drop-shadow-[0_0_5px_#00f0ff]" /> Discover Nearby Places</>
           )}
         </button>
       </div>
@@ -128,23 +130,23 @@ const DiscoveryPanel = ({ onAddLocations }) => {
               animate={{ opacity: 1, y: 0 }}
               key={place.id}
               onClick={() => toggleSelect(place)}
-              className={`p-3 rounded-xl border transition-all cursor-pointer ${
+              className={`p-3 rounded-xl border transition-all cursor-pointer glass-panel-hover ${
                 selectedIds.has(place.id) 
-                  ? 'bg-sky-500/10 border-sky-500/50' 
-                  : 'bg-slate-800/30 border-white/5 hover:border-white/20'
+                  ? 'bg-cyan-400/10 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.3)]' 
+                  : 'glass-panel hover:border-cyan-400/50'
               }`}
             >
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                  <h4 className="text-sm font-semibold text-slate-100">{place.name}</h4>
-                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
-                    <span className="flex items-center gap-1 text-amber-400">
+                  <h4 className="text-sm font-bold text-slate-100">{place.name}</h4>
+                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                    <span className="flex items-center gap-1 text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.6)]">
                       <Star size={10} fill="currentColor" /> {place.rating}
                     </span>
                     <span className="flex items-center gap-1">
                       <MapPin size={10} /> {(place.distance/1000).toFixed(1)}km
                     </span>
-                    <span className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-400 font-mono">
+                    <span className="bg-[var(--bg-dark)] border border-cyan-400/30 px-1.5 py-0.5 rounded neon-text-cyan font-mono text-[8px] uppercase">
                       Score: {place.score}
                     </span>
                   </div>
@@ -153,16 +155,16 @@ const DiscoveryPanel = ({ onAddLocations }) => {
                   {selectedIds.has(place.id) && (
                     <button 
                       onClick={(e) => toggleMandatory(e, place.id)}
-                      className={`p-1.5 rounded transition-colors ${mandatoryIds.has(place.id) ? 'text-sky-400 bg-sky-400/20' : 'text-slate-500 hover:text-slate-300'}`}
+                      className={`p-1.5 rounded transition-all ${mandatoryIds.has(place.id) ? 'neon-text-cyan bg-cyan-400/20 shadow-[0_0_8px_rgba(0,240,255,0.4)]' : 'text-[var(--text-muted)] hover:text-cyan-400'}`}
                       title="Mark as Mandatory"
                     >
                       <ShieldCheck size={16} />
                     </button>
                   )}
                   <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                    selectedIds.has(place.id) ? 'bg-sky-500 border-sky-500' : 'border-slate-600'
+                    selectedIds.has(place.id) ? 'bg-cyan-400 border-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.5)]' : 'border-[var(--text-muted)]'
                   }`}>
-                    {selectedIds.has(place.id) && <Check size={12} className="text-white" />}
+                    {selectedIds.has(place.id) && <Check size={12} className="text-[#050511] font-bold" />}
                   </div>
                 </div>
               </div>
@@ -179,7 +181,7 @@ const DiscoveryPanel = ({ onAddLocations }) => {
       {selectedIds.size > 0 && (
         <button 
           onClick={handleIntegrate}
-          className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-sky-900/20 flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-cyan-500 to-fuchsia-600 hover:from-cyan-400 hover:to-fuchsia-500 text-white font-bold py-3 rounded-xl shadow-[0_0_20px_rgba(255,0,85,0.4)] hover:shadow-[0_0_30px_rgba(0,240,255,0.6)] flex items-center justify-center gap-2 transition-all transform hover:-translate-y-1"
         >
           <Plus size={18} /> Add {selectedIds.size} Locations to Engine
         </button>

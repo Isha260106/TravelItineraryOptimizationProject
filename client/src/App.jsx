@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Map as MapIcon, Calendar, Settings2, Info, ChevronRight } from 'lucide-react';
+import { Map as MapIcon, Settings2 } from 'lucide-react';
 import MapComponent from './components/MapComponent';
 import ItineraryTimeline from './components/ItineraryTimeline';
 import ConstraintPanel from './components/ConstraintPanel';
@@ -25,6 +25,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('constraints');
   const [loading, setLoading] = useState(false);
   const [directions, setDirections] = useState(null);
+  const [discoveryResults, setDiscoveryResults] = useState([]);
+  const [startLocationName, setStartLocationName] = useState("Hotel (Start)");
 
   // Auto-optimize when locations or constraints change
   useEffect(() => {
@@ -41,7 +43,7 @@ function App() {
     setLoading(true);
     try {
       const response = await axios.post(`${API_BASE}/optimize`, {
-        source: { name: "Hotel (Start)", lat: 40.7549, lng: -73.9840 },
+        source: { name: startLocationName || "Start Location", lat: 40.7549, lng: -73.9840 },
         destinations: locations,
         constraints
       });
@@ -78,38 +80,38 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#0f172a] text-slate-200 overflow-hidden font-sans">
+    <div className="flex flex-col-reverse md:flex-row h-screen w-full bg-[var(--bg-dark)] text-[var(--text-main)] overflow-hidden font-sans">
       {/* Sidebar */}
-      <aside className="w-96 flex flex-col border-r border-white/5 z-20 glass-panel">
-        <header className="p-6 border-b border-white/5">
+      <aside className="flex-none w-full md:w-96 h-[45vh] md:h-screen flex flex-col border-t md:border-t-0 md:border-r border-[var(--panel-border)] shadow-[2px_0_20px_rgba(0,0,0,0.5)] z-20 glass-panel">
+        <header className="p-6 border-b border-[var(--panel-border)]">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <MapIcon className="text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+              <MapIcon className="text-white drop-shadow-md" />
             </div>
             <div>
-              <h1 className="font-bold text-xl tracking-tight">CAA-TIOS</h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Constraint-Aware Engine</p>
+              <h1 className="font-bold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500">CAA-TIOS</h1>
+              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold">Constraint-Aware Engine</p>
             </div>
           </div>
         </header>
 
         {/* Tabs */}
-        <div className="flex px-6 pt-6 gap-6 text-sm font-medium border-b border-white/5">
+        <div className="flex px-6 pt-6 gap-6 text-sm font-medium border-b border-[var(--panel-border)]">
           <button 
             onClick={() => setActiveTab('constraints')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'constraints' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500'}`}
+            className={`pb-4 border-b-2 transition-all ${activeTab === 'constraints' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
           >
             Constraints
           </button>
           <button 
             onClick={() => setActiveTab('discovery')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'discovery' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500'}`}
+            className={`pb-4 border-b-2 transition-all ${activeTab === 'discovery' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
           >
             Discovery
           </button>
           <button 
             onClick={() => setActiveTab('itinerary')}
-            className={`pb-4 border-b-2 transition-all ${activeTab === 'itinerary' ? 'border-sky-500 text-sky-400' : 'border-transparent text-slate-500'}`}
+            className={`pb-4 border-b-2 transition-all ${activeTab === 'itinerary' ? 'border-cyan-400 neon-text-cyan' : 'border-transparent text-[var(--text-muted)] hover:text-cyan-300'}`}
           >
             Itinerary
           </button>
@@ -131,6 +133,8 @@ function App() {
                   setLocations={setLocations}
                   constraints={constraints}
                   setConstraints={setConstraints}
+                  startLocationName={startLocationName}
+                  setStartLocationName={setStartLocationName}
                 />
               </motion.div>
             ) : activeTab === 'discovery' ? (
@@ -141,7 +145,7 @@ function App() {
                 exit={{ opacity: 0, x: -20 }}
                 className="h-full"
               >
-                <DiscoveryPanel onAddLocations={handleAddLocations} />
+                <DiscoveryPanel onAddLocations={handleAddLocations} onSearchResults={setDiscoveryResults} />
               </motion.div>
             ) : (
               <motion.div 
@@ -166,8 +170,8 @@ function App() {
       </aside>
 
       {/* Main Map Area */}
-      <main className="flex-1 relative">
-        <MapComponent locations={locations} itinerary={itinerary} />
+      <main className="flex-1 relative h-[55vh] md:h-screen min-w-0">
+        <MapComponent locations={locations} itinerary={itinerary} discoveryResults={discoveryResults} />
         
         {/* Floating Info Overlay */}
         <div className="absolute top-6 right-6 space-y-4">
@@ -175,32 +179,32 @@ function App() {
             <motion.div 
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-panel p-4 rounded-2xl border border-sky-500/20 shadow-2xl min-w-[200px]"
+              className="glass-panel p-4 rounded-2xl neon-border-cyan shadow-2xl min-w-[200px]"
             >
-              <div className="text-[10px] uppercase text-sky-400 font-bold mb-2">Trip Summary</div>
+              <div className="text-[10px] uppercase neon-text-cyan font-bold mb-2 tracking-wider">Trip Summary</div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xl font-bold">{itinerary.days.length}</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Days</div>
+                  <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-cyan-200">{itinerary.days.length}</div>
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Days</div>
                 </div>
                 <div>
-                  <div className="text-xl font-bold">{Math.round(itinerary.totalTravelTime / 60)}h</div>
-                  <div className="text-[10px] text-slate-500 uppercase">Travel</div>
+                  <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-cyan-200">{Math.round(itinerary.totalTravelTime / 60)}h</div>
+                  <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Travel</div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Train ML Agent</div>
+              <div className="mt-4 pt-4 border-t border-[var(--panel-border)] space-y-2">
+                <div className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1 tracking-wider">Train ML Agent</div>
                 <div className="flex gap-2">
                   <button 
                     onClick={() => sendFeedback('PREFERENCE_TIME')}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-[10px] py-1.5 rounded transition-all"
+                    className="flex-1 bg-[var(--bg-dark)] hover:bg-slate-800 text-[10px] py-1.5 rounded transition-all border border-[var(--panel-border)] hover:border-cyan-400/50"
                   >
                     Prioritize Time
                   </button>
                   <button 
                     onClick={() => sendFeedback('PREFERENCE_DISTANCE')}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-[10px] py-1.5 rounded transition-all"
+                    className="flex-1 bg-[var(--bg-dark)] hover:bg-slate-800 text-[10px] py-1.5 rounded transition-all border border-[var(--panel-border)] hover:border-cyan-400/50"
                   >
                     Prioritize Dist
                   </button>
@@ -209,17 +213,22 @@ function App() {
             </motion.div>
           )}
           
-          <div className="glass-panel p-4 rounded-2xl border border-white/5 shadow-2xl flex items-center gap-3">
-             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-             <span className="text-xs font-medium text-slate-400">Optimization Engine Active</span>
+          <div className="glass-panel p-4 rounded-2xl border border-[var(--panel-border)] shadow-2xl flex items-center gap-3">
+             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse" />
+             <span className="text-xs font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-fuchsia-500 tracking-wider">Optimization Engine Active</span>
           </div>
         </div>
 
         {loading && (
-          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
-            <div className="flex flex-col items-center space-y-4">
-              <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sky-400 font-medium animate-pulse">Running Genetic Algorithm...</p>
+          <div className="absolute inset-0 z-50 bg-[#050511]/80 backdrop-blur-md flex items-center justify-center">
+            <div className="flex flex-col items-center space-y-6">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-cyan-400/20 rounded-full" />
+                <div className="absolute inset-0 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_#00f0ff]" />
+                <div className="absolute inset-2 border-4 border-fuchsia-500/20 rounded-full" />
+                <div className="absolute inset-2 border-4 border-fuchsia-500 border-b-transparent rounded-full animate-spin-reverse shadow-[0_0_10px_#ff0055]" style={{animationDirection: "reverse"}} />
+              </div>
+              <p className="neon-text-cyan font-bold tracking-widest animate-pulse uppercase text-sm">Running Genetic Algorithm...</p>
             </div>
           </div>
         )}
