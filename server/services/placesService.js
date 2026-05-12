@@ -33,6 +33,32 @@ class PlacesService {
     }
   }
 
+  async autocomplete(query) {
+    if (!this.apiKey) throw new Error("API Key missing for Autocomplete");
+    try {
+      const response = await axios.get('https://maps.googleapis.com/maps/api/place/autocomplete/json', {
+        params: { input: query, key: this.apiKey }
+      });
+      
+      if (response.data.status === 'REQUEST_DENIED') {
+        console.warn("Autocomplete API Denied");
+        return [];
+      }
+      
+      if (response.data.status !== 'OK' && response.data.status !== 'ZERO_RESULTS') {
+        throw new Error(`Autocomplete API Error: ${response.data.status}`);
+      }
+      
+      return response.data.predictions.map(p => ({
+        description: p.description,
+        place_id: p.place_id
+      }));
+    } catch (error) {
+      console.warn("Autocomplete Error:", error.message);
+      return [];
+    }
+  }
+
   async getMockCoordinates(query) {
     try {
       // Free open-source geocoding fallback
