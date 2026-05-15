@@ -1,0 +1,287 @@
+{
+  "metrics": {
+    "rank_model": {
+      "mae": 7.389162561576307e-05,
+      "rmse": 0.0011097419040461843,
+      "r2": 0.9999992209118018
+    },
+    "arrival_model": {
+      "mae": 52.57076973108993,
+      "rmse": 66.8993055846052,
+      "r2": 0.6605847695884361
+    },
+    "departure_model": {
+      "mae": 52.56665643059733,
+      "rmse": 66.8854078594896,
+      "r2": 0.6607257758235151
+    },
+    "status_model": {
+      "accuracy": 0.9975308641975309,
+      "precision_macro": 0.49876543209876545,
+      "recall_macro": 0.5,
+      "f1_macro": 0.49938195302843014,
+      "f1_weighted": 0.9962978223382014,
+      "classes": [
+        "feasible",
+        "infeasible"
+      ]
+    },
+    "warning_model": {
+      "accuracy": 1.0,
+      "precision_macro": 1.0,
+      "recall_macro": 1.0,
+      "f1_macro": 1.0,
+      "f1_weighted": 1.0,
+      "classes": [
+        0
+      ]
+    }
+  },
+  "cities": [
+    "Mumbai",
+    "Bangalore",
+    "Delhi"
+  ],
+  "locations": {
+    "Marine Drive": {
+      "lat": "18.944",
+      "lng": "72.823",
+      "rating": "4.0",
+      "open_time": [
+        8,
+        0
+      ],
+      "close_time": [
+        18,
+        0
+      ],
+      "visit_duration": "60",
+      "mandatory": true
+    },
+    "Juhu Beach": {
+      "lat": "19.0883",
+      "lng": "72.8264",
+      "rating": "4.0",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        19,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Gateway of India": {
+      "lat": "18.922",
+      "lng": "72.8347",
+      "rating": "4.1",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Siddhivinayak Temple": {
+      "lat": "19.0176",
+      "lng": "72.8302",
+      "rating": "4.2",
+      "open_time": [
+        8,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Elephanta Caves": {
+      "lat": "18.9633",
+      "lng": "72.9315",
+      "rating": "4.2",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "60",
+      "mandatory": true
+    },
+    "Bannerghatta National Park": {
+      "lat": "12.8",
+      "lng": "77.577",
+      "rating": "4.2",
+      "open_time": [
+        8,
+        0
+      ],
+      "close_time": [
+        18,
+        0
+      ],
+      "visit_duration": "90",
+      "mandatory": true
+    },
+    "Bangalore Palace": {
+      "lat": "12.9987",
+      "lng": "77.592",
+      "rating": "4.3",
+      "open_time": [
+        8,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "60",
+      "mandatory": true
+    },
+    "Lalbagh Botanical Garden": {
+      "lat": "12.9507",
+      "lng": "77.5848",
+      "rating": "4.5",
+      "open_time": [
+        9,
+        0
+      ],
+      "close_time": [
+        19,
+        0
+      ],
+      "visit_duration": "90",
+      "mandatory": true
+    },
+    "ISKCON Temple Bangalore": {
+      "lat": "13.0097",
+      "lng": "77.5511",
+      "rating": "4.6",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        18,
+        0
+      ],
+      "visit_duration": "60",
+      "mandatory": true
+    },
+    "Cubbon Park": {
+      "lat": "12.9763",
+      "lng": "77.5929",
+      "rating": "4.4",
+      "open_time": [
+        9,
+        0
+      ],
+      "close_time": [
+        19,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Red Fort": {
+      "lat": "28.6562",
+      "lng": "77.241",
+      "rating": "4.3",
+      "open_time": [
+        9,
+        0
+      ],
+      "close_time": [
+        18,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Qutub Minar": {
+      "lat": "28.5244",
+      "lng": "77.1855",
+      "rating": "4.1",
+      "open_time": [
+        8,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "India Gate": {
+      "lat": "28.6129",
+      "lng": "77.2295",
+      "rating": "4.6",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Akshardham Temple": {
+      "lat": "28.6127",
+      "lng": "77.2773",
+      "rating": "4.5",
+      "open_time": [
+        10,
+        0
+      ],
+      "close_time": [
+        17,
+        0
+      ],
+      "visit_duration": "45",
+      "mandatory": true
+    },
+    "Lotus Temple": {
+      "lat": "28.5535",
+      "lng": "77.2588",
+      "rating": "4.3",
+      "open_time": [
+        9,
+        0
+      ],
+      "close_time": [
+        18,
+        0
+      ],
+      "visit_duration": "60",
+      "mandatory": true
+    },
+    "feasible": {
+      "lat": "3",
+      "lng": 0,
+      "rating": 0,
+      "open_time": [
+        0,
+        0
+      ],
+      "close_time": [
+        0,
+        0
+      ],
+      "visit_duration": 0,
+      "mandatory": false
+    }
+  }
+}

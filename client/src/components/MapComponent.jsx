@@ -3,7 +3,8 @@ import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-go
 
 const mapContainerStyle = {
   width: '100%',
-  height: '100%'
+  height: '100%',
+  borderRadius: 'var(--radius-lg)'
 };
 
 const center = {
@@ -13,10 +14,11 @@ const center = {
 
 const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMap }) => {
   const [directions, setDirections] = useState(null);
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
+    googleMapsApiKey: mapsApiKey
   });
 
   // Calculate real-world directions when itinerary changes
@@ -70,9 +72,10 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMa
   }, [locations]);
 
   const discoveryMarkers = useMemo(() => {
-    if (!discoveryResults) return [];
+    if (!discoveryResults?.length) return [];
     return discoveryResults.map((loc, idx) => ({
-      id: `disc-${loc.id || idx}`,
+      place: loc,
+      key: loc.id != null ? `disc-${loc.id}` : `disc-idx-${idx}`,
       position: { lat: loc.lat, lng: loc.lng },
       title: loc.name,
       icon: 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png'
@@ -88,6 +91,33 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMa
     }
     return center;
   }, [markers, discoveryResults]);
+
+  if (!mapsApiKey) {
+    return (
+      <div className="flex-col align-center justify-center gap-sm h-full w-full text-center p-md" style={{ background: 'var(--surface-color)' }}>
+        <span className="icon" style={{ fontSize: '48px', color: 'var(--text-muted)' }}>
+          map
+        </span>
+        <p className="font-bold text-main">Map needs an API key</p>
+        <p className="text-sm text-muted max-w-sm">
+          Add <span style={{ fontFamily: 'monospace', color: 'var(--primary-color)' }}>VITE_GOOGLE_MAPS_API_KEY</span> to{' '}
+          <span style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>client/.env</span>, then restart Vite.
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex-col align-center justify-center gap-sm h-full w-full text-center p-md" style={{ background: 'var(--surface-color)' }}>
+        <span className="icon" style={{ fontSize: '48px', color: '#ef4444' }}>
+          error
+        </span>
+        <p className="font-bold text-main">Maps failed to load</p>
+        <p className="text-sm text-muted max-w-sm">Check the browser console, billing, and API restrictions for your key.</p>
+      </div>
+    );
+  }
 
   return isLoaded ? (
     <GoogleMap
@@ -110,18 +140,13 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMa
         />
       ))}
 
-      {discoveryMarkers.map(marker => (
+      {discoveryMarkers.map((marker) => (
         <Marker
-          key={marker.id}
+          key={marker.key}
           position={marker.position}
           title={marker.title}
           icon={marker.icon}
-          onClick={() => {
-             const place = discoveryResults.find(r => `disc-${r.id}` === marker.id || `disc-${r.name}` === marker.id || `disc-${discoveryResults.indexOf(r)}` === marker.id);
-             if (place && onAddFromMap) {
-                onAddFromMap(place);
-             }
-          }}
+          onClick={() => onAddFromMap?.(marker.place)}
         />
       ))}
 
@@ -131,15 +156,20 @@ const MapComponent = ({ locations, itinerary, discoveryResults = [], onAddFromMa
           options={{
             suppressMarkers: true, // We already have custom markers
             polylineOptions: {
-              strokeColor: '#2563eb', // Royal blue for visibility on light natural map
-              strokeOpacity: 0.9,
-              strokeWeight: 6,
+              strokeColor: '#00d2ff',
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
             }
           }}
         />
       )}
     </GoogleMap>
-  ) : <div className="w-full h-full flex items-center justify-center bg-[var(--bg-dark)] text-[var(--text-muted)]">Loading Map...</div>;
+  ) : (
+    <div className="flex-col align-center justify-center gap-sm h-full w-full" style={{ background: 'var(--surface-color)' }}>
+      <div className="spinner icon" style={{ fontSize: '32px', color: 'var(--primary-color)' }}>autorenew</div>
+      <p className="text-sm text-muted font-bold">Loading map…</p>
+    </div>
+  );
 };
 
 const darkMapStyles = [

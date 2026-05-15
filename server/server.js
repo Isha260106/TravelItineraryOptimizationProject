@@ -18,6 +18,14 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 /**
+ * @route GET /api/health
+ * @desc Liveness check for the UI status indicator
+ */
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, mongo: mongoose.connection.readyState === 1 });
+});
+
+/**
  * @route GET /api/nearby-places
  * @desc Discover points of interest around a location
  */

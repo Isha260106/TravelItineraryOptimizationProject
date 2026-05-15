@@ -1,270 +1,306 @@
-import React, { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import MapComponent from './components/MapComponent';
 import ItineraryTimeline from './components/ItineraryTimeline';
 import ConstraintPanel from './components/ConstraintPanel';
 import DiscoveryPanel from './components/DiscoveryPanel';
+import AppSidebar from './components/layout/AppSidebar';
+import AppHeader from './components/layout/AppHeader';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE } from './config';
+import ToastBanner from './ui/ToastBanner';
+import Spinner from './ui/Spinner';
+import Button from './ui/Button';
 
-const API_BASE = "http://localhost:5000/api";
+const MapComponent = lazy(() => import('./components/MapComponent'));
 
 function App() {
   const [locations, setLocations] = useState([]);
 
   const [constraints, setConstraints] = useState({
     maxDays: 2,
-    startTime: 540, // 9 AM
+    startTime: 540,
   });
 
   const [itinerary, setItinerary] = useState(null);
   const [activeTab, setActiveTab] = useState('constraints');
   const [loading, setLoading] = useState(false);
-  const [directions, setDirections] = useState(null);
   const [discoveryResults, setDiscoveryResults] = useState([]);
-  const [startLocationName, setStartLocationName] = useState("");
+  const [startLocationName, setStartLocationName] = useState('');
+  const [toast, setToast] = useState(null);
+  const [apiOnline, setApiOnline] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Auto-optimize when locations or constraints change
+  const notify = useCallback((message, variant = 'info') => {
+    setToast({ message, variant, id: Date.now() });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 5200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ping = async () => {
+      try {
+        await axios.get(`${API_BASE}/health`, { timeout: 4000 });
+        if (!cancelled) setApiOnline(true);
+      } catch {
+        if (!cancelled) setApiOnline(false);
+      }
+    };
+    ping();
+    const id = setInterval(ping, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  const handleOptimize = useCallback(
+    async (isManual = false) => {
+      if (locations.length === 0) {
+        if (isManual) {
+          notify('Add at least one destination before running optimization.', 'warning');
+        }
+        return;
+      }
+
+      setLoading(true);
+      try {
+        let sourceLat = locations.length > 0 ? locations[0].lat : 40.7549;
+        let sourceLng = locations.length > 0 ? locations[0].lng : -73.984;
+
+        if (startLocationName && startLocationName.toLowerCase() !== 'hotel (start)') {
+          try {
+            const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+            if (apiKey) {
+              const geoRes = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+                params: { address: startLocationName, key: apiKey },
+              });
+              if (geoRes.data.status === 'OK' && geoRes.data.results.length > 0) {
+                sourceLat = geoRes.data.results[0].geometry.location.lat;
+                sourceLng = geoRes.data.results[0].geometry.location.lng;
+              }
+            }
+          } catch (e) {
+            console.error('Geocoding failed for start location', e);
+          }
+        }
+
+        const response = await axios.post(`${API_BASE}/optimize`, {
+          source: {
+            name: startLocationName || (locations.length > 0 ? locations[0].name : 'Start Location'),
+            lat: sourceLat,
+            lng: sourceLng,
+          },
+          destinations: locations,
+          constraints,
+        });
+        setItinerary(response.data);
+        if (isManual === true) {
+          setActiveTab('itinerary');
+          notify('Itinerary updated.', 'success');
+        }
+      } catch (error) {
+        console.error('Optimization failed', error);
+        if (isManual) {
+          notify('Could not reach the optimizer. Start the API server (npm start in server/) and try again.', 'error');
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [locations, constraints, startLocationName, notify]
+  );
+
   useEffect(() => {
     const timer = setTimeout(() => {
       if (locations.length > 0) {
         handleOptimize(false);
       }
-    }, 1000); // 1s debounce
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [locations, constraints]);
-
-  const handleOptimize = async (isManual = false) => {
-    if (locations.length === 0) {
-      if (isManual) alert("Please add at least one destination before running the optimization engine.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let sourceLat = locations.length > 0 ? locations[0].lat : 40.7549;
-      let sourceLng = locations.length > 0 ? locations[0].lng : -73.9840;
-
-      if (startLocationName && startLocationName.toLowerCase() !== "hotel (start)") {
-        try {
-          const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-          const geoRes = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json`, {
-            params: { address: startLocationName, key: apiKey }
-          });
-          if (geoRes.data.status === 'OK' && geoRes.data.results.length > 0) {
-            sourceLat = geoRes.data.results[0].geometry.location.lat;
-            sourceLng = geoRes.data.results[0].geometry.location.lng;
-          }
-        } catch (e) {
-          console.error("Geocoding failed for start location", e);
-        }
-      }
-
-      const response = await axios.post(`${API_BASE}/optimize`, {
-        source: { name: startLocationName || (locations.length > 0 ? locations[0].name : "Start Location"), lat: sourceLat, lng: sourceLng },
-        destinations: locations,
-        constraints
-      });
-      setItinerary(response.data);
-      if (isManual === true) {
-        setActiveTab('itinerary');
-      }
-    } catch (error) {
-      console.error("Optimization failed", error);
-      if (isManual) alert("Error optimizing itinerary. Is the backend running?");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [locations, constraints, startLocationName, handleOptimize]);
 
   const handleAddLocations = (newLocations) => {
-    // Prevent duplicates by name
-    setLocations(prevLocations => {
-      const existingNames = new Set(prevLocations.map(l => l.name));
-      const filtered = newLocations.filter(nl => !existingNames.has(nl.name));
-
-      // Check for capacity warning
+    let shouldWarnCapacity = false;
+    setLocations((prevLocations) => {
+      const existingNames = new Set(prevLocations.map((l) => l.name));
+      const filtered = newLocations.filter((nl) => !existingNames.has(nl.name));
       if (prevLocations.length + filtered.length > 8) {
-        alert("Warning: Selected locations might exceed feasible travel capacity for the given days.");
+        shouldWarnCapacity = true;
       }
-
       return [...prevLocations, ...filtered];
     });
-  };
-
-  const sendFeedback = async (actionType) => {
-    try {
-      await axios.post(`${API_BASE}/feedback`, { actionType });
-      handleOptimize(false); // Re-run with new weights
-    } catch (error) {
-      console.error("Feedback failed", error);
+    if (shouldWarnCapacity) {
+      notify('You have many stops; consider fewer destinations or more days for a realistic plan.', 'warning');
     }
   };
 
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
   return (
-    <div className="bg-background text-on-background flex h-screen overflow-hidden font-sans">
-      {/* Side Navigation */}
-      <aside className="flex flex-col h-full py-6 bg-surface-container-lowest border-r border-outline-variant fixed w-[256px] left-0 top-0 z-50">
-        <div className="px-6 mb-10">
-          <h1 className="font-mono text-2xl font-semibold leading-tight font-bold text-primary">CAA-TIOS-ND</h1>
-          <p className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase text-on-surface-variant tracking-widest mt-1">MISSION CONTROL</p>
-        </div>
+    <div className="app-container">
+      <a href="#main-content" className="skip-link" style={{ position: 'absolute', top: '-1000px' }}>
+        Skip to content
+      </a>
 
-        <nav className="flex-1 space-y-1">
-          <button
-            onClick={() => setActiveTab('constraints')}
-            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'constraints'
-                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
-              }`}
-          >
-            <span className="material-symbols-outlined mr-3">tune</span>
-            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">SETTINGS</span>
-          </button>
+      <AppSidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        locations={locations}
+        onOptimize={() => handleOptimize(true)}
+        loading={loading}
+        mobileMenuOpen={mobileMenuOpen}
+        onNavigate={closeMobileMenu}
+      />
 
-          <button
-            onClick={() => setActiveTab('discovery')}
-            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'discovery'
-                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
-              }`}
-          >
-            <span className="material-symbols-outlined mr-3">explore</span>
-            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">DISCOVERY</span>
-          </button>
+      {mobileMenuOpen && (
+        <button
+          type="button"
+          className="overlay mobile-menu-btn"
+          aria-label="Close navigation menu"
+          onClick={closeMobileMenu}
+        />
+      )}
 
-          <button
-            onClick={() => setActiveTab('itinerary')}
-            className={`w-full flex items-center px-6 py-3 transition-colors duration-200 ${activeTab === 'itinerary'
-                ? 'text-primary border-l-2 border-primary bg-surface-container-highest neon-glow-left'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
-              }`}
-          >
-            <span className="material-symbols-outlined mr-3">map</span>
-            <span className="font-mono text-[11px] font-bold tracking-[0.15em] uppercase">ITINERARY</span>
-          </button>
-        </nav>
+      <div className="flex-1 flex-col h-full relative" style={{ minWidth: 0 }}>
+        <AppHeader
+          activeTab={activeTab}
+          apiOnline={apiOnline}
+          menuOpen={mobileMenuOpen}
+          onMenuClick={() => setMobileMenuOpen((o) => !o)}
+        />
 
-        <div className="px-4 mt-auto">
-          <button
-            onClick={() => handleOptimize(true)}
-            className="w-full py-3 px-4 bg-primary text-on-primary font-bold text-[11px] font-bold tracking-[0.15em] uppercase rounded-lg flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
-          >
-            <span className="material-symbols-outlined">rocket_launch</span>
-            RUN OPTIMIZATION
-          </button>
-        </div>
-      </aside>
+        <main id="main-content" tabIndex={-1} className="main-content">
+          <section className="glass-panel panel-container" data-full={activeTab === 'itinerary'}>
+            <AnimatePresence mode="wait">
+              {activeTab === 'constraints' && (
+                <motion.div
+                  key="constraints"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex-col h-full"
+                >
+                  <ConstraintPanel
+                    locations={locations}
+                    setLocations={setLocations}
+                    constraints={constraints}
+                    setConstraints={setConstraints}
+                    startLocationName={startLocationName}
+                    setStartLocationName={setStartLocationName}
+                    notify={notify}
+                  />
+                </motion.div>
+              )}
 
-      {/* Top App Bar */}
-      <header className="fixed top-0 right-0 left-[256px] h-[64px] w-[calc(100%-256px)] flex justify-between items-center px-6 bg-[#131b2e] border-b border-[#3b494c] z-50">
-        <div className="flex items-center gap-8">
-          <span className="font-mono text-2xl font-semibold leading-tight text-[#baf2ff] font-bold">
-            {activeTab === 'constraints' ? 'LOGISTICS CONFIGURATION' :
-              activeTab === 'discovery' ? 'DISCOVERY ENGINE' : 'ITINERARY VISUALIZATION'}
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#4edea3] shadow-[0_0_8px_#4edea3]"></div>
-            <span className="font-mono text-[10px] font-medium tracking-tight text-[#bac9cd] uppercase">System Online</span>
-          </div>
-        </div>
-      </header>
+              {activeTab === 'discovery' && (
+                <motion.div
+                  key="discovery"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex-col h-full"
+                >
+                  <DiscoveryPanel onAddLocations={handleAddLocations} onSearchResults={setDiscoveryResults} />
+                </motion.div>
+              )}
 
-      {/* Main Content Canvas */}
-      <main className="ml-[256px] mt-[64px] flex w-[calc(100%-256px)] h-[calc(100vh-64px)] overflow-hidden bg-[#060e20]">
-
-        {/* Left Panel (30-40% depending on tab) */}
-        <section className={`border-r border-outline-variant bg-surface-container flex flex-col custom-scrollbar overflow-y-auto transition-all duration-300 ${activeTab === 'itinerary' ? 'w-full' : 'w-1/3 min-w-[400px]'}`}>
-          <AnimatePresence mode="wait">
-            {activeTab === 'constraints' && (
-              <motion.div
-                key="constraints"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="h-full flex flex-col"
-              >
-                <ConstraintPanel
-                  onOptimize={() => handleOptimize(true)}
-                  locations={locations}
-                  setLocations={setLocations}
-                  constraints={constraints}
-                  setConstraints={setConstraints}
-                  startLocationName={startLocationName}
-                  setStartLocationName={setStartLocationName}
-                />
-              </motion.div>
-            )}
-
-            {activeTab === 'discovery' && (
-              <motion.div
-                key="discovery"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="h-full flex flex-col"
-              >
-                <DiscoveryPanel onAddLocations={handleAddLocations} onSearchResults={setDiscoveryResults} />
-              </motion.div>
-            )}
-
-            {activeTab === 'itinerary' && (
-              <motion.div
-                key="itinerary"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="h-full flex flex-col p-6"
-              >
-                {itinerary ? (
-                  <ItineraryTimeline itinerary={itinerary} />
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 text-outline">
-                    <span className="material-symbols-outlined text-[48px] opacity-20">settings_alert</span>
-                    <p className="font-mono">NO ITINERARY GENERATED<br />CONFIGURE CONSTRAINTS AND RUN OPTIMIZATION</p>
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
-
-        {/* Right Map Interface */}
-        {activeTab !== 'itinerary' && (
-          <section className="flex-1 relative bg-[#060e20]">
-            <MapComponent
-              locations={locations}
-              itinerary={itinerary}
-              discoveryResults={discoveryResults}
-              onAddFromMap={(place) => {
-                handleAddLocations([{
-                  name: place.name,
-                  lat: place.lat,
-                  lng: place.lng,
-                  duration: 60,
-                  mandatory: false,
-                  timeWindow: { open: 540, close: 1080 }
-                }]);
-              }}
-            />
-
-            {/* Overlays */}
-            {loading && (
-              <div className="absolute inset-0 z-50 bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-center">
-                <div className="flex flex-col items-center space-y-6">
-                  <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-primary/20 rounded-full" />
-                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-[0_0_15px_#baf2ff]" />
-                  </div>
-                  <p className="font-mono text-primary tracking-widest animate-pulse">RUNNING GENETIC ALGORITHM...</p>
-                </div>
-              </div>
-            )}
+              {activeTab === 'itinerary' && (
+                <motion.div
+                  key="itinerary"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex-col h-full p-md"
+                >
+                  {itinerary ? (
+                    <ItineraryTimeline itinerary={itinerary} />
+                  ) : (
+                    <div className="empty-state">
+                      <span className="icon" aria-hidden>route</span>
+                      <h3 style={{ marginBottom: '8px', color: 'var(--text-main)' }}>No plan yet</h3>
+                      <p style={{ maxWidth: '300px' }}>
+                        Add destinations, then use <strong>Optimize route</strong> in the sidebar to build your timeline.
+                      </p>
+                      <div className="flex-row justify-center gap-sm mt-md">
+                        <Button variant="secondary" size="md" onClick={() => setActiveTab('constraints')}>
+                          Trip setup
+                        </Button>
+                        <Button variant="primary" size="md" onClick={() => setActiveTab('discovery')}>
+                          Explore places
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
-        )}
-      </main>
+
+          {activeTab !== 'itinerary' && (
+            <section className="map-container">
+              <Suspense
+                fallback={
+                  <div className="h-full flex-col align-center justify-center" style={{ backgroundColor: 'var(--bg-color)' }}>
+                    <Spinner label="Loading map" />
+                  </div>
+                }
+              >
+                <MapComponent
+                  locations={locations}
+                  itinerary={itinerary}
+                  discoveryResults={discoveryResults}
+                  onAddFromMap={(place) => {
+                    handleAddLocations([
+                      {
+                        name: place.name,
+                        lat: place.lat,
+                        lng: place.lng,
+                        duration: 60,
+                        mandatory: false,
+                        timeWindow: { open: 540, close: 1080 },
+                      },
+                    ]);
+                  }}
+                />
+              </Suspense>
+
+              {loading && (
+                <div className="overlay">
+                  <div className="glass-panel p-md flex-col align-center gap-sm" style={{ width: '300px', textAlign: 'center' }}>
+                    <Spinner label="Optimizing route" />
+                    <p style={{ fontWeight: 600 }}>Optimizing your route…</p>
+                    <p className="text-sm text-muted">
+                      Live distances apply when your Google Maps keys are configured.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </main>
+      </div>
+
+      <AnimatePresence>
+        {toast && <ToastBanner toast={toast} onDismiss={() => setToast(null)} />}
+      </AnimatePresence>
     </div>
   );
 }
