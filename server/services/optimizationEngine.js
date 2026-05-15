@@ -32,7 +32,8 @@ class OptimizationEngine {
    * @param {Object} data - { source, destinations, constraints }
    */
   optimize(data) {
-    const { source, destinations, constraints } = data;
+    const { source, destinations, constraints, distanceMatrix } = data;
+    this.distanceMatrix = distanceMatrix; // Store matrix for evaluation
     const allLocations = [source, ...destinations];
     const n = destinations.length;
     
@@ -180,9 +181,9 @@ class OptimizationEngine {
       const from = allLocations[currentLocIdx];
       const to = allLocations[nextLocIdx];
       
-      // Get travel time and distance (mocked or from distance matrix service)
-      const travelTime = this.getTravelTime(from, to, currentTime);
-      const distance = this.getDistance(from, to);
+      // Get travel time and distance from the distance matrix
+      const travelTime = this.getTravelTime(currentLocIdx, nextLocIdx, currentTime);
+      const distance = this.getDistance(currentLocIdx, nextLocIdx);
 
       let arrivalTime = currentTime + travelTime;
       
@@ -259,16 +260,30 @@ class OptimizationEngine {
   }
 
   // Utilities
-  getTravelTime(from, to, timeOfDay) {
-    // In a real app, this would use Google Distance Matrix API with traffic
-    // For the engine logic, we assume a base time + traffic factor
+  getTravelTime(fromIdx, toIdx, timeOfDay) {
+    if (this.distanceMatrix && this.distanceMatrix.rows[fromIdx] && this.distanceMatrix.rows[fromIdx].elements[toIdx]) {
+      const element = this.distanceMatrix.rows[fromIdx].elements[toIdx];
+      if (element.status === 'OK') {
+        const baseMins = Math.ceil(element.duration.value / 60);
+        // We can still apply a subtle traffic factor if we want to simulate time-of-day dynamic traffic
+        // Or just use the raw time. Let's use the exact routing time returned by Maps API.
+        return baseMins;
+      }
+    }
+    // Fallback if matrix fails or element missing
     const baseTime = 30; // 30 mins
-    const trafficFactor = 1 + 0.5 * Math.sin((timeOfDay / (24 * 60)) * 2 * Math.PI); // Peak hours simulation
+    const trafficFactor = 1 + 0.5 * Math.sin((timeOfDay / (24 * 60)) * 2 * Math.PI);
     return Math.floor(baseTime * trafficFactor);
   }
 
-  getDistance(from, to) {
-    return 10; // 10 km
+  getDistance(fromIdx, toIdx) {
+    if (this.distanceMatrix && this.distanceMatrix.rows[fromIdx] && this.distanceMatrix.rows[fromIdx].elements[toIdx]) {
+      const element = this.distanceMatrix.rows[fromIdx].elements[toIdx];
+      if (element.status === 'OK') {
+        return element.distance.value / 1000; // Returns km
+      }
+    }
+    return 10; // Fallback 10 km
   }
 
   formatTime(minutes) {

@@ -18,6 +18,14 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 /**
+ * @route GET /api/health
+ * @desc Liveness check for the UI status indicator
+ */
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, mongo: mongoose.connection.readyState === 1 });
+});
+
+/**
  * @route GET /api/nearby-places
  * @desc Discover points of interest around a location
  */
@@ -35,6 +43,22 @@ app.get('/api/nearby-places', async (req, res) => {
   } catch (error) {
     console.error("Discovery error:", error);
     res.status(500).json({ error: "Failed to discover nearby places" });
+  }
+});
+
+/**
+ * @route GET /api/autocomplete
+ * @desc Get asynchronous place predictions
+ */
+app.get('/api/autocomplete', async (req, res) => {
+  try {
+    const { input } = req.query;
+    if (!input || input.length < 3) return res.json({ predictions: [] });
+    const predictions = await placesService.autocomplete(input);
+    res.json({ predictions });
+  } catch (error) {
+    console.error("Autocomplete error:", error);
+    res.status(500).json({ error: "Failed to fetch autocomplete suggestions" });
   }
 });
 
@@ -63,8 +87,12 @@ app.post('/api/optimize', async (req, res) => {
     const learnedWeights = adaptiveLearningService.getWeights();
     engine.updateWeights(learnedWeights);
 
+    // Fetch real distance matrix
+    const allLocations = [source, ...destinations];
+    const distanceMatrix = await googleMapsService.getDistanceMatrix(allLocations, allLocations);
+
     // Run GA Optimization
-    const result = engine.optimize({ source, destinations, constraints });
+    const result = engine.optimize({ source, destinations, constraints, distanceMatrix });
     
     res.json({ ...result, learnedWeights });
   } catch (error) {
@@ -91,10 +119,14 @@ app.post('/api/save-itinerary', async (req, res) => {
  * @route POST /api/validate
  * @desc Validate a manually modified itinerary
  */
-app.post('/api/validate', (req, res) => {
+app.post('/api/validate', async (req, res) => {
   try {
     const { chromo, source, destinations, constraints } = req.body;
     const allLocations = [source, ...destinations];
+    
+    // Fetch matrix to properly decode the travel times
+    const distanceMatrix = await googleMapsService.getDistanceMatrix(allLocations, allLocations);
+    engine.distanceMatrix = distanceMatrix;
     
     const result = engine.decode(chromo, allLocations, constraints);
     res.json(result);
